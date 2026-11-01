@@ -29,7 +29,7 @@ typedef struct _usb_ds34
     int outEndp;
     u8 enabled;
     u8 status;
-    u8 type;      // 0 - ds3, 1 - ds4, 2 - guitar hero guitar, 3 - rock band guitar
+    u8 type;      // 0 - ds3, 1 - ds4, 2 - guitar hero, 3 - rock band, 4 - 8BitDo
     u8 oldled[4]; // rgb for ds4 and blink
     u8 lrum;
     u8 rrum;
