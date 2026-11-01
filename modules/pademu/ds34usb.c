@@ -245,7 +245,12 @@ static void usb_config_set(int result, int count, void *arg)
 
     PollSema(ds34pad[pad].sema);
 
-    ds34pad[pad].status |= DS34USB_STATE_CONFIGURED;
+if (result != USB_RC_OK) {
+    SignalSema(ds34pad[pad].sema);
+    return;
+}
+
+ds34pad[pad].status |= DS34USB_STATE_CONFIGURED;
 
     if (ds34pad[pad].type == DS3) {
         DS3USB_init(pad);
