@@ -90,6 +90,11 @@ int usb_probe(int devId)
     if (device->idVendor == DS34_VID && (device->idProduct == DS3_PID || device->idProduct == DS4_PID || device->idProduct == DS4_PID_SLIM))
         return 1;
 
+    // 8BitDo Ultimate C 2.4G - DInput
+    if (device->idVendor == EIGHTBITDO_VID &&
+        device->idProduct == EIGHTBITDO_DINPUT_PID)
+        return 1;
+
     return 0;
 }
 
@@ -134,6 +139,10 @@ int usb_connect(int devId)
     } else if (device->idProduct == ROCK_BAND_PS3_PID) {
         ds34pad[pad].type = GUITAR_RB;
         epCount = interface->bNumEndpoints - 1;
+    } else if (device->idVendor == EIGHTBITDO_VID &&
+               device->idProduct == EIGHTBITDO_DINPUT_PID) {
+        ds34pad[pad].type = EIGHTBITDO;
+        epCount = interface->bNumEndpoints - 1;
     } else {
         ds34pad[pad].type = DS4;
         epCount = 20; // ds4 v2 returns interface->bNumEndpoints as 0
@@ -157,9 +166,10 @@ int usb_connect(int devId)
 
     } while (epCount--);
 
-    if (ds34pad[pad].interruptEndp < 0 || ds34pad[pad].outEndp < 0) {
-        usb_release(pad);
-        return 1;
+    if (ds34pad[pad].interruptEndp < 0 ||
+    (ds34pad[pad].type != EIGHTBITDO && ds34pad[pad].outEndp < 0)) {
+    usb_release(pad);
+    return 1;
     }
 
     ds34pad[pad].status |= DS34USB_STATE_CONNECTED;
@@ -249,7 +259,10 @@ static void usb_config_set(int result, int count, void *arg)
         led[3] = 0;
     }
 
-    LEDRumble(led, 0, 0, pad);
+    // 8BitDo: nao enviar comandos de LED/vibracao do DualShock
+    if (ds34pad[pad].type != EIGHTBITDO) {
+        LEDRumble(led, 0, 0, pad);
+    }
 
     ds34pad[pad].status |= DS34USB_STATE_RUNNING;
 
@@ -473,11 +486,13 @@ int ds34usb_get_data(u8 *dst, int size, int port)
     ret = ds34pad[port].analog_btn & 1;
 
     if (ds34pad[port].update_rum) {
-        ret = LEDRumble(ds34pad[port].oldled, ds34pad[port].lrum, ds34pad[port].rrum, port);
-        if (ret == USB_RC_OK)
-            TransferWait(ds34pad[port].cmd_sema);
-        else
-            DPRINTF("DS34USB: LEDRumble usb transfer error %d\n", ret);
+        if (ds34pad[port].type != EIGHTBITDO) {
+            ret = LEDRumble(ds34pad[port].oldled, ds34pad[port].lrum, ds34pad[port].rrum, port);
+            if (ret == USB_RC_OK)
+                TransferWait(ds34pad[port].cmd_sema);
+            else
+                DPRINTF("DS34USB: LEDRumble usb transfer error %d\n", ret);
+        }
 
         ds34pad[port].update_rum = 0;
     }
