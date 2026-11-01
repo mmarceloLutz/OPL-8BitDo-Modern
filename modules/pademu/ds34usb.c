@@ -284,6 +284,99 @@ static void DS3USB_init(int pad)
 static void readReport(u8 *data, int pad_idx)
 {
     ds34usb_device *pad = &ds34pad[pad_idx];
+
+   // 8BitDo Ultimate C 2.4G - DInput
+    if (pad->type == EIGHTBITDO) {
+        if (data[0] != 0x01)
+            return;
+
+        // Inicializar botoes digitais como soltos
+        pad->data[0] = 0xFF;
+        pad->data[1] = 0xFF;
+
+        // Botoes principais do 8BitDo
+        // A = X (Cross) do PS2
+        if (data[1] & 0x01)
+            pad->data[1] &= ~0x40;
+
+        // B = Circulo do PS2
+        if (data[1] & 0x02)
+            pad->data[1] &= ~0x20;
+
+        // X = Quadrado do PS2
+        if (data[1] & 0x08)
+            pad->data[1] &= ~0x80;
+
+        // Y = Triangulo do PS2
+        if (data[1] & 0x10)
+            pad->data[1] &= ~0x10;
+
+        // Botoes superiores e gatilhos
+        if (data[1] & 0x40) // L1
+            pad->data[1] &= ~0x04;
+
+        if (data[1] & 0x80) // R1
+            pad->data[1] &= ~0x08;
+
+        if (data[2] & 0x01) // L2
+            pad->data[1] &= ~0x01;
+
+        if (data[2] & 0x02) // R2
+            pad->data[1] &= ~0x02;
+
+        // Start e Select
+        if (data[2] & 0x04) // Select
+            pad->data[0] &= ~0x01;
+
+        if (data[2] & 0x08) // Start
+            pad->data[0] &= ~0x08;
+
+        // Botoes dos analogicos
+        if (data[2] & 0x20) // L3
+            pad->data[0] &= ~0x02;
+
+        if (data[2] & 0x40) // R3
+            pad->data[0] &= ~0x04;
+        
+        // Direcional digital (Hat Switch)
+        switch (data[3] & 0x0F) {
+            case 0: // Cima
+                pad->data[0] &= ~0x10;
+                break;
+            case 1: // Cima + Direita
+                pad->data[0] &= ~0x30;
+                break;
+            case 2: // Direita
+                pad->data[0] &= ~0x20;
+                break;
+            case 3: // Baixo + Direita
+                pad->data[0] &= ~0x60;
+                break;
+            case 4: // Baixo
+                pad->data[0] &= ~0x40;
+                break;
+            case 5: // Baixo + Esquerda
+                pad->data[0] &= ~0xC0;
+                break;
+            case 6: // Esquerda
+                pad->data[0] &= ~0x80;
+                break;
+            case 7: // Cima + Esquerda
+                pad->data[0] &= ~0x90;
+                break;
+            default: // Direcional solto
+                break;
+        }
+        
+        // Formato DualShock 2: RX, RY, LX, LY
+        pad->data[2] = data[6];
+        pad->data[3] = data[7];
+        pad->data[4] = data[4];
+        pad->data[5] = data[5];
+
+        return;
+    }
+
     if (pad->type == GUITAR_GH || pad->type == GUITAR_RB) {
         struct ds3guitarreport *report;
 
