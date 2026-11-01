@@ -9,6 +9,10 @@
 #define DS4       1
 #define GUITAR_GH 2
 #define GUITAR_RB 3
+#define EIGHTBITDO 4
+
+#define EIGHTBITDO_VID 0x2DC8
+#define EIGHTBITDO_DINPUT_PID 0x3016
 
 #define MODEL_GUITAR 1
 #define MODEL_PS2    3
