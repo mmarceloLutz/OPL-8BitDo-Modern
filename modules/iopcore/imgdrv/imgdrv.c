@@ -10,7 +10,12 @@ unsigned int ioprpimg = 0xDEC1DEC1;
 int ioprpsiz = 0xDEC2DEC2;
 const char name[] = "host";
 
-int dummy_fs()
+int dummy_init_fs(iop_device_t *device)
+{
+    return 0;
+}
+
+int dummy_open_fs(iop_file_t *fd, const char *name, int flags)
 {
     return 0;
 }
@@ -30,7 +35,7 @@ int read_fs(iop_file_t *fd, void *buffer, int size)
     return size;
 }
 
-int close_fs()
+int close_fs(iop_file_t *fd)
 {
     DelDrv(name);
     return 0;
@@ -59,10 +64,10 @@ typedef struct _iop_device_ops_tm
 
 iop_device_ops_t my_device_ops =
     {
-        dummy_fs, // init
-        dummy_fs, // deinit
-        NULL,     // dummy_fs,// format
-        dummy_fs, // open_fs,// open
+        dummy_init_fs, // init
+        dummy_init_fs, // deinit
+        NULL,          // format
+        dummy_open_fs, // open
         close_fs, // close
         read_fs,  // read
         NULL,     // dummy_fs,// write
