@@ -50,9 +50,17 @@ typedef struct _xbox360usb_device
     u8 rrum;
     u8 update_rum;
 
+   /* Dados convertidos para o formato PS2 */
     u8 data[18];
+
+/* Buffer para relatorios USB recebidos */
+    u8 usb_buffer[XBOX360_MAX_BUFFER_SIZE];
+
     u8 analog_btn;
     u8 btn_delay;
+
+    /* Indica desconexao USB pendente */
+    volatile int disconnect_pending;
 
 } xbox360usb_device;
 
