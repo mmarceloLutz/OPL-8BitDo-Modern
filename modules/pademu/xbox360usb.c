@@ -235,13 +235,25 @@ static int xbox360usb_connect(int devId)
  * ao gerenciamento dos dispositivos.
  */
 
+
 static int xbox360usb_disconnect(int devId)
 {
     int pad;
 
     for (pad = 0; pad < XBOX360_MAX_PADS; pad++) {
+
         if (xbox360dev[pad].usb_id == devId) {
+
+            /* Registrar desconexao pendente */
+            xbox360dev[pad].disconnect_pending = 1;
+
+            /* Impedir que o controle continue ativo */
+            xbox360dev[pad].status &=
+                ~XBOX360USB_STATE_RUNNING;
+
+            /* Tentar liberar os recursos USB */
             xbox360usb_release(pad);
+
             break;
         }
     }
@@ -252,14 +264,19 @@ static int xbox360usb_disconnect(int devId)
 static void xbox360usb_release(int pad)
 {
     xbox360usb_device *dev;
+    int locked = 0;
 
     if (pad < 0 || pad >= XBOX360_MAX_PADS)
         return;
 
     dev = &xbox360dev[pad];
 
-    if (dev->sema >= 0)
-        WaitSema(dev->sema);
+    if (dev->sema >= 0) {
+        if (PollSema(dev->sema) == 0)
+            locked = 1;
+        else
+            return;
+    }
 
     dev->status = XBOX360USB_STATE_DISCONNECTED;
 
@@ -283,7 +300,7 @@ static void xbox360usb_release(int pad)
     mips_memset(&dev->data[2], 0x7F, 4);
     mips_memset(&dev->data[6], 0x00, 12);
 
-    if (dev->sema >= 0)
+    if (locked)
         SignalSema(dev->sema);
 }
 
@@ -305,6 +322,7 @@ int xbox360usb_init(u8 pads, u8 options)
             XBOX360USB_STATE_DISCONNECTED;
 
         xbox360dev[pad].usb_resultcode = 1;
+        xbox360dev[pad].disconnect_pending = 0;
         xbox360dev[pad].update_rum = 0;
         xbox360dev[pad].lrum = 0;
         xbox360dev[pad].rrum = 0;
@@ -355,6 +373,17 @@ static void xbox360usb_config_set(
 
     if (result != USB_RC_OK)
         return;
+
+    if (xbox360dev[pad].usb_id < 0)
+    return;
+
+/* Nao reativar dispositivo em desconexao */
+if (xbox360dev[pad].disconnect_pending)
+    return;
+
+if (!(xbox360dev[pad].status &
+      XBOX360USB_STATE_CONNECTED))
+    return;
 
     xbox360dev[pad].status |=
         XBOX360USB_STATE_CONFIGURED;
