@@ -41,6 +41,7 @@ typedef struct _xbox360usb_device
     int controlEndp;
     int interruptEndp;
     int usb_resultcode;
+    volatile int read_pending;
 
     u8 enabled;
     u8 status;
@@ -54,7 +55,8 @@ typedef struct _xbox360usb_device
     u8 data[18];
 
 /* Buffer para relatorios USB recebidos */
-    u8 usb_buffer[XBOX360_MAX_BUFFER_SIZE];
+    u8 usb_buffer[XBOX360_MAX_BUFFER_SIZE]
+    __attribute__((aligned(4)));
 
     u8 analog_btn;
     u8 btn_delay;
