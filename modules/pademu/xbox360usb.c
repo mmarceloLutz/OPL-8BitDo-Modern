@@ -29,7 +29,15 @@ static int xbox360usb_probe(int devId);
 static int xbox360usb_connect(int devId);
 static int xbox360usb_disconnect(int devId);
 static void xbox360usb_release(int pad);
+static void xbox360usb_process_pending_disconnects(void);
 static void xbox360usb_config_set(
+    int result,
+    int count,
+    void *arg
+);
+
+/* Callback de recepcao dos dados USB */
+static void xbox360usb_read_callback(
     int result,
     int count,
     void *arg
@@ -109,11 +117,11 @@ static int xbox360usb_connect(int devId)
     char *descriptorPtr;
 
     for (pad = 0; pad < XBOX360_MAX_PADS; pad++) {
-        if (xbox360dev[pad].usb_id == -1 &&
-            xbox360dev[pad].enabled)
-            break;
+      if (xbox360dev[pad].usb_id == -1 &&
+    xbox360dev[pad].enabled &&
+    !xbox360dev[pad].disconnect_pending)
+    break;
     }
-
     if (pad >= XBOX360_MAX_PADS)
         return 1;
 
@@ -272,11 +280,14 @@ static void xbox360usb_release(int pad)
     dev = &xbox360dev[pad];
 
     if (dev->sema >= 0) {
-        if (PollSema(dev->sema) == 0)
-            locked = 1;
-        else
-            return;
+    if (PollSema(dev->sema) == 0) {
+        locked = 1;
+    } else {
+        /* Manter a liberacao pendente */
+        dev->disconnect_pending = 1;
+        return;
     }
+}
 
     dev->status = XBOX360USB_STATE_DISCONNECTED;
 
@@ -293,6 +304,8 @@ static void xbox360usb_release(int pad)
     dev->usb_id = -1;
     dev->usb_resultcode = 1;
     dev->update_rum = 0;
+    /* Limpeza concluida: permitir nova conexao */
+    dev->disconnect_pending = 0;
 
     dev->data[0] = 0xFF;
     dev->data[1] = 0xFF;
@@ -302,6 +315,24 @@ static void xbox360usb_release(int pad)
 
     if (locked)
         SignalSema(dev->sema);
+}
+
+/*
+ * Processa desconexoes que nao puderam
+ * ser concluidas anteriormente.
+ *
+ * Deve ser chamada em um contexto seguro.
+ */
+static void xbox360usb_process_pending_disconnects(void)
+{
+    int pad;
+
+    for (pad = 0; pad < XBOX360_MAX_PADS; pad++) {
+
+        if (xbox360dev[pad].disconnect_pending) {
+            xbox360usb_release(pad);
+        }
+    }
 }
 
 int xbox360usb_init(u8 pads, u8 options)
@@ -337,6 +368,12 @@ int xbox360usb_init(u8 pads, u8 options)
 
         mips_memset(&xbox360dev[pad].data[2], 0x7F, 4);
         mips_memset(&xbox360dev[pad].data[6], 0x00, 12);
+        /* Inicializar buffer de recepcao USB */
+        mips_memset(
+            xbox360dev[pad].usb_buffer,
+            0x00,
+            XBOX360_MAX_BUFFER_SIZE
+        );
 
         xbox360dev[pad].sema =
             CreateMutex(IOP_MUTEX_UNLOCKED);
@@ -390,4 +427,44 @@ if (!(xbox360dev[pad].status &
 
     xbox360dev[pad].status |=
         XBOX360USB_STATE_RUNNING;
+}
+
+/*
+ * Callback executado quando uma transferencia
+ * USB de leitura e concluida.
+ */
+static void xbox360usb_read_callback(
+    int result,
+    int count,
+    void *arg
+)
+{
+    int pad = (int)arg;
+
+    if (pad < 0 || pad >= XBOX360_MAX_PADS)
+        return;
+
+    /* Ignorar callbacks de dispositivos desconectados */
+    if (xbox360dev[pad].disconnect_pending ||
+        xbox360dev[pad].usb_id < 0)
+        return;
+
+    /* Verificar resultado da transferencia */
+    if (result != USB_RC_OK)
+        return;
+
+    /* Nenhum dado recebido */
+    if (count <= 0)
+        return;
+
+    /* Evitar processamento fora do buffer */
+    if (count > XBOX360_MAX_BUFFER_SIZE)
+        return;
+
+    /*
+     * Futuramente:
+     * 1. Validar o relatorio XInput.
+     * 2. Converter os botoes para o formato PS2.
+     * 3. Solicitar a proxima leitura USB.
+     */
 }
